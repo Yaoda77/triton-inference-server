@@ -664,7 +664,7 @@ ValidateOutputParameter(const rapidjson::Value& io)
             "Output can't set both 'shared_memory_region' and "
             "'classification'");
       }
-      const auto& itr =params.FindMember("binary_data");
+      const auto& itr = params.FindMember("binary_data");
       if ((itr != params.MemberEnd()) && (itr->value.GetBool())) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
@@ -1219,26 +1219,66 @@ void
 HTTPAPIServerV2::HandleRepositoryIndex(
     evhtp_request_t* req, const std::string& repository_name)
 {
-  if (req->method != htp_method_GET) {
+  if (req->method != htp_method_POST) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
+  }
+
+  TRITONSERVER_Error* err = nullptr;
+
+  struct evbuffer_iovec* v = nullptr;
+  int v_idx = 0;
+  int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
+  if (n > 0) {
+    v = static_cast<struct evbuffer_iovec*>(
+        alloca(sizeof(struct evbuffer_iovec) * n));
+    if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INTERNAL,
+          "unexpected error getting registry index request body");
+    }
+  }
+
+  bool loaded = false;
+
+  if (err == nullptr) {
+    // If no request json then just use all default values.
+    size_t buffer_len = evbuffer_get_length(req->buffer_in);
+    if (buffer_len > 0) {
+      rapidjson::Document index_request;
+      err = EVBufferToJson(&index_request, v, &v_idx, buffer_len, n);
+      if (err == nullptr) {
+        const auto& loaded_itr = index_request.FindMember("loaded");
+        if (loaded_itr != index_request.MemberEnd()) {
+          loaded = loaded_itr->value.GetBool();
+        }
+      }
+    }
   }
 
   evhtp_headers_add_header(
       req->headers_out,
       evhtp_header_new("Content-Type", "application/json", 1, 1));
 
-  TRITONSERVER_Message* message = nullptr;
-  auto err = TRITONSERVER_ServerModelIndex(server_.get(), &message);
   if (err == nullptr) {
-    const char* buffer;
-    size_t byte_size;
-    err = TRITONSERVER_MessageSerializeToJson(message, &buffer, &byte_size);
-    if (err == nullptr) {
-      evbuffer_add(req->buffer_out, buffer, byte_size);
-      evhtp_send_reply(req, EVHTP_RES_OK);
+    uint32_t flags = TRITONSERVER_INDEX_FLAG_NONE;
+    if (loaded) {
+      flags |= TRITONSERVER_INDEX_FLAG_LOADED;
     }
-    TRITONSERVER_MessageDelete(message);
+
+    TRITONSERVER_Message* message = nullptr;
+    auto err = TRITONSERVER_ServerModelIndex(server_.get(), flags, &message);
+    if (err == nullptr) {
+      const char* buffer;
+      size_t byte_size;
+      err = TRITONSERVER_MessageSerializeToJson(message, &buffer, &byte_size);
+      if (err == nullptr) {
+        evbuffer_add(req->buffer_out, buffer, byte_size);
+        evhtp_send_reply(req, EVHTP_RES_OK);
+      }
+
+      TRITONSERVER_MessageDelete(message);
+    }
   }
 
   if (err != nullptr) {
@@ -1802,7 +1842,7 @@ HTTPAPIServerV2::EVBufferToInput(
   const rapidjson::Value& inputs = itr->value;
   for (size_t i = 0; i < inputs.Size(); i++) {
     const rapidjson::Value& request_input = inputs[i];
-    RETURN_IF_TRITON_ERR(ValidateInputContentType(request_input));
+    RETURN_IF_ERR(ValidateInputContentType(request_input));
 
     const auto& name_itr = request_input.FindMember("name");
     if (name_itr == request_input.MemberEnd()) {
@@ -1966,7 +2006,7 @@ HTTPAPIServerV2::EVBufferToInput(
     rapidjson::Value& outputs_array = itr->value;
     for (size_t i = 0; i < outputs_array.Size(); i++) {
       rapidjson::Value& output = outputs_array[i];
-      RETURN_IF_TRITON_ERR(ValidateOutputParameter(output));
+      RETURN_IF_ERR(ValidateOutputParameter(output));
 
       const auto& name_itr = output.FindMember("name");
       if (name_itr == output.MemberEnd()) {

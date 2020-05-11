@@ -1001,6 +1001,12 @@ message RepositoryIndexRequest
   //@@     for all repositories.
   //@@
   string repository_name = 1;
+
+  //@@  .. cpp:var:: bool loaded
+  //@@
+  //@@     If true returned only models currently loaded in the server.
+  //@@
+  bool loaded = 2;
 }
 
 //@@
@@ -1023,6 +1029,20 @@ message RepositoryIndexResponse
     //@@       The name of the model.
     //@@
     string name = 1;
+
+    //@@
+    //@@    .. cpp:var:: string state
+    //@@
+    //@@       The state of the model.
+    //@@
+    string state = 2;
+
+    //@@
+    //@@    .. cpp:var:: string reason
+    //@@
+    //@@       The reason, if any, that the model is in the given state.
+    //@@
+    string reason = 3;
   }
 
   //@@

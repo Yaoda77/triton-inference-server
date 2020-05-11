@@ -1776,7 +1776,8 @@ TRITONSERVER_ServerModelConfig(
 
 TRITONSERVER_Error*
 TRITONSERVER_ServerModelIndex(
-    TRITONSERVER_Server* server, TRITONSERVER_Message** repository_index)
+    TRITONSERVER_Server* server, uint32_t flags,
+    TRITONSERVER_Message** repository_index)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 

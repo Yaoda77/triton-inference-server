@@ -1047,9 +1047,14 @@ CommonHandler::SetUpAllRequests()
                                       grpc::Status* status) {
     TRITONSERVER_Error* err = nullptr;
     if (request.repository_name().empty()) {
+      uint32_t flags = TRITONSERVER_INDEX_FLAG_NONE;
+      if (request.loaded()) {
+        flags |= TRITONSERVER_INDEX_FLAG_LOADED;
+      }
+
       TRITONSERVER_Message* model_index_message = nullptr;
       err = TRITONSERVER_ServerModelIndex(
-          tritonserver_.get(), &model_index_message);
+          tritonserver_.get(), flags, &model_index_message);
       if (err == nullptr) {
         const char* buffer;
         size_t byte_size;
