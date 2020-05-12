@@ -41,7 +41,6 @@ CLIENT_LOG="./client.log"
 PERF_CLIENT=../clients/perf_client
 DATADIR="/data/inferenceserver/${REPO_VERSION}/qa_model_repository"
 
-# BACKENDS="custom"
 BACKENDS="graphdef libtorch netdef onnx plan savedmodel custom"
 
 rm -rf models && mkdir models
