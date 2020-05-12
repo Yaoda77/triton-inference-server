@@ -39,8 +39,17 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
 PERF_CLIENT=../clients/perf_client
-
 DATADIR="/data/inferenceserver/${REPO_VERSION}/qa_model_repository"
+
+# BACKENDS="custom"
+BACKENDS="graphdef libtorch netdef onnx plan savedmodel custom"
+
+rm -rf models && mkdir models
+for BACKEND in $BACKENDS; do
+ cp -r ${DATADIR}/${BACKEND}_float32_float32_float32 models/.
+done
+
+cp -r ../custom_models/custom_float32_float32_float32 models/.
 
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
@@ -71,16 +80,14 @@ export AWS_ACCESS_KEY_ID=minio && \
 
 # create and add data to bucket
 python -m pip install awscli-local && \
-    awslocal --endpoint-url=http://localhost:4572 s3 mb s3://demo-bucket && \
-    awslocal s3 sync $DATADIR s3://demo-bucket
+    awslocal --endpoint-url=http://localhost:4572 mb s3://demo-bucket && \
+    awslocal s3 sync models s3://demo-bucket
 
 RET=0
 
 # Test with hostname
 SERVER_ARGS="--model-repository=s3://localhost:4572/demo-bucket --model-control-mode=explicit"
 SERVER_LOG="./inference_server_hostname.log"
-
-BACKENDS="graphdef libtorch netdef onnx plan savedmodel custom"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -98,13 +105,18 @@ for BACKEND in $BACKENDS; do
     if [ "$code" != "200" ]; then
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
-    fi
-
-    $PERF_CLIENT -m ${BACKEND}_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        cat $CLIENT_LOG
-        RET=1
+    else
+        $PERF_CLIENT -m ${BACKEND}_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** Test Failed\n***"
+            cat $CLIENT_LOG
+            RET=1
+        fi
+        code=`curl -s -w %{http_code} -X POST localhost:8000/api/modelcontrol/unload/${BACKEND}_float32_float32_float32`
+        if [ "$code" != "200" ]; then
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
     fi
 done
 set -e
@@ -132,13 +144,18 @@ for BACKEND in $BACKENDS; do
     if [ "$code" != "200" ]; then
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
-    fi
-
-    $PERF_CLIENT -m ${BACKEND}_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        cat $CLIENT_LOG
-        RET=1
+    else
+        $PERF_CLIENT -m ${BACKEND}_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** Test Failed\n***"
+            cat $CLIENT_LOG
+            RET=1
+        fi
+        code=`curl -s -w %{http_code} -X POST localhost:8000/api/modelcontrol/unload/${BACKEND}_float32_float32_float32`
+        if [ "$code" != "200" ]; then
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
     fi
 done
 set -e
