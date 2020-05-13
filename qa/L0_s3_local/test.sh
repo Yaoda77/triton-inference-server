@@ -41,14 +41,17 @@ CLIENT_LOG="./client.log"
 PERF_CLIENT=../clients/perf_client
 DATADIR="/data/inferenceserver/${REPO_VERSION}/qa_model_repository"
 
-BACKENDS="graphdef libtorch netdef onnx plan savedmodel custom"
+BACKENDS="graphdef savedmodel custom"
+# BACKENDS="graphdef libtorch netdef onnx plan savedmodel custom"
 
 rm -rf models && mkdir models
 for BACKEND in $BACKENDS; do
- cp -r ${DATADIR}/${BACKEND}_float32_float32_float32 models/.
+    if [ "$BACKEND" != "custom" ]; then
+        cp -r ${DATADIR}/${BACKEND}_float32_float32_float32 models/.
+    else
+        cp -r /opt/tritonserver/qa/custom_models/custom_float32_float32_float32 models/.
+    fi
 done
-
-cp -r ../custom_models/custom_float32_float32_float32 models/.
 
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
