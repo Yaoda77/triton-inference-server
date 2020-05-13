@@ -41,8 +41,7 @@ CLIENT_LOG="./client.log"
 PERF_CLIENT=../clients/perf_client
 DATADIR="/data/inferenceserver/${REPO_VERSION}/qa_model_repository"
 
-BACKENDS="graphdef savedmodel custom"
-# BACKENDS="graphdef libtorch netdef onnx plan savedmodel custom"
+BACKENDS="graphdef libtorch netdef onnx plan savedmodel custom"
 
 rm -rf models && mkdir models
 for BACKEND in $BACKENDS; do
@@ -82,7 +81,7 @@ export AWS_ACCESS_KEY_ID=minio && \
 
 # create and add data to bucket
 python -m pip install awscli-local && \
-    awslocal --endpoint-url=http://localhost:4572 mb s3://demo-bucket && \
+    awslocal --endpoint-url=http://localhost:4572 s3 mb s3://demo-bucket && \
     awslocal s3 sync models s3://demo-bucket
 
 RET=0
